@@ -1,0 +1,1352 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en"><generator uri="https://jekyllrb.com/" version="4.3.2">Jekyll</generator><link href="http://localhost:4000/yenhochen/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/yenhochen/" rel="alternate" type="text/html" hreflang="en" /><updated>2023-08-21T14:39:03-04:00</updated><id>http://localhost:4000/yenhochen/feed.xml</id><title type="html">blank</title><subtitle></subtitle><entry><title type="html">ADMM for Generalized Lasso Inference</title><link href="http://localhost:4000/yenhochen/blog/2023/ADMM-Generalized-Lasso/" rel="alternate" type="text/html" title="ADMM for Generalized Lasso Inference" /><published>2023-08-21T00:53:00-04:00</published><updated>2023-08-21T00:53:00-04:00</updated><id>http://localhost:4000/yenhochen/blog/2023/ADMM-Generalized-Lasso</id><content type="html" xml:base="http://localhost:4000/yenhochen/blog/2023/ADMM-Generalized-Lasso/"><![CDATA[<hr />
+
+<p>Sparsity plays an important role in machine learning, statistics, and signal processing. In the basic set up, we are given a noisy observation \(y\in\mathbb{R}^m\) and a dictionary \(D \in \mathbb{R}^{m\times n}\). The goal is to estimate the weights \(w \in \mathbb{R}^n\) that produce the observation under the assumption that most of its entries have a value of zero. A popular approach to obtaining sparse solutions is through the class of \(\ell_1\) penalized regression problems. Mathematically, these are written as</p>
+
+\[\DeclareMathOperator*{\argmin}{arg\,min}
+% \DeclareMathOperator{\argmax}{arg\,max}
+
+\begin{equation}
+\label{eq:general-lasso}
+w^* = \argmin_{w} \frac{1}{2} \| Dw - y \|_2^2 + \lambda \| F w \|_1
+\end{equation}\]
+
+<p>where \(F \in \mathbb{R}^{k \times n}\) encodes \(K\) distinct \(\ell_1\)-norm penalties, and  \(\lambda \geq 0\) is a lagrange multiplier that determines the strength of those penalty terms. In statistics, this is also known as the generalized Lasso problem <a class="citation" href="#tibshirani2011solution">[1]</a>. The main challenge with solving equation \(\ref{eq:general-lasso}\) lies in the non-differentiability of the \(\ell_1\)-norm. Therefore, we cannot obtain an analytical solution and must resort to iterative solvers.</p>
+
+<p><br /></p>
+
+<!-- The main aim of this post is to carefully work through the derivation of an efficient iterative solution for L1 penalized objectives. While existing texts offer the solution, they often omit many important details in the explanation and assume substantial background knowledge. In contrast, I provide a derivation that is accessible to those with only a basic knowledge in matrix calculus and linear algebra. -->
+
+<hr />
+
+<!-- This is achieved by combining the benefits of decomposability from dual ascent with the fast convergence properties of the method of multipliers. -->
+
+<h3 id="deriving-an-admm-algorithm">Deriving an ADMM algorithm</h3>
+
+<p>An overview of the ADMM framework can be found 
+<a href="/yenhochen/blog/2023/Alternating-Directions-Method-of-Multipliers/">here</a> 
+. We can rewrite the generalized Lasso into ADMM form by introducing a variable \(z\) and a constraint which transforms equation \(\ref{eq:general-lasso}\) into the following problem</p>
+
+\[\begin{equation}
+\min_w \frac{1}{2} \|Dw-y \|_2^2 + \lambda \| z \|_1 \quad
+\textrm{ subject to }
+F w = z
+\end{equation}\]
+
+<p>The corresponding scaled Augmented Lagragian is given by</p>
+
+\[\begin{equation}
+\label{eq:L}
+L(w, z, u) = \frac{1}{2} \|Dw-y \|_2^2 + \lambda \| z \|_1 + \frac{\rho}{2} \|F w-z +u \|_2^2 - \frac{\rho}{2} \|u \|_2^2
+\end{equation}\]
+
+<p>Note that introducing \(z\) doesn’t change the optimal solution since the additional penalty terms in \(L\) are minimized when \(w-z=0\). However, we benefit from separating the \(\ell_1\) penalty from the reconstruction term. ADMM proceeds with block minimization under \(L\). This consists of an \(w\)-minimization step, a  \(z\)-minimization step, and a gradient ascent update step on the dual variables \(u\). 
+<!-- However, a major benefit is that the ADMM form enables separability between the smooth and non-smooth components in the objective.  -->
+<!-- As a result, we can proceed .  --></p>
+
+<hr />
+
+<h5 id="updating-w">Updating \(w\)</h5>
+
+<p>The standard ADMM update for \(w\) is given by</p>
+
+\[w_{k+1} = \argmin_w \hspace{0.2em} L(w, z_{k}, u_k)\]
+
+<p>To obtain the RHS, we set the partial derivative of equation \(\ref{eq:L}\) wrt. \(w\) to zero.</p>
+
+\[\nabla_w L = D^\top(Dw-y) + \rho F^\top (F w-z+u) = 0\]
+
+<p>Now rearrange to collect terms with \(w\) on the LHS and all other terms on the RHS.</p>
+
+\[D^\top Dw  + \rho F^\top F w = D^\top y + \rho F^\top z - \rho F^\top u\]
+
+<p>Factorize and solve for \(w\).</p>
+
+\[w^* = (D^\top D  + \rho F^\top F)^{-1}(D^\top y +\rho F^\top (z_k - u_k))\]
+
+<p>\(w^*\) minimizes the augmented Lagrangian given our previous estimates of \(z_k\) and \(u_k\) and becomes the closed-form update rule for \(w_{k+1}\).</p>
+
+<!-- $$
+\begin{alignat*}{2}
+\Rightarrow \quad &D^\top Dw  + \rho F^\top F w = D^\top y + \rho F^\top z - \rho F^\top u\\
+% &(D^\top D  + \rho F^\top F) w = D^\top y +\rho F^\top (z - u)\\
+\Rightarrow \quad & w = (D^\top D  + \rho F^\top F)^{-1}(D^\top y +\rho F^\top (z_k - u_k))\\
+\end{alignat*}
+$$ -->
+
+<hr />
+
+<h5 id="updating-z">Updating \(z\)</h5>
+
+<p>Next, we find the ADMM update for \(z\)</p>
+
+\[z_{k+1} = \argmin_z \hspace{0.2em} L(w_{k+1}, z, u_k)\]
+
+<p>Similarly, we set the partial derivative of \(L\) wrt. \(z\) to zero</p>
+
+\[\begin{equation}
+\label{eq:L_z}
+\nabla_z L = \frac{\partial}{\partial z} (\lambda \|z \|_1) - \rho (Fw-z+u) = 0
+\end{equation}\]
+
+<p>Immediately, we encounter the non-differentiable \(\ell_1\) term. We can proceed by observing two facts.  1) The overall \(\ell_1\) penalty can be decomposed as a sum of \(\ell_1\) separate penalties placed on each component of \(z\),  i.e.
+\(\|z\|_1 = \sum_{i=1}^N |z_i|\). Therefore, we can deal with each component independently. And
+2) For each component, there exists only a single discontinuity centered around zero, and that the derivative exists for all other values. Therefore, we can split this problem into two cases \(z=0\) and \(z\neq 0\).</p>
+
+<p><br /></p>
+
+<p>For \(z \neq 0\), the derivative is equal to the \({\rm sign} (z)\) which can be substituted into equation \(\ref{eq:L_z}\) to get</p>
+
+\[\lambda {\rm sign}(z) - \rho (Fw-z+u) = 0\]
+
+<p>Collecting all terms with \(z\) on the LHS and all others on the RHS, we get</p>
+
+\[z + \frac{\lambda}{\rho} {\rm sign}(z)= Fw + u\]
+
+<p>When \(z &lt; 0\), then \(Fw + u &lt; -\frac{\lambda}{\rho}\) and when \(z &gt; 0\), then \(Fw + u &gt; \frac{\lambda}{\rho}\). This observation can be compactly written as
+\(|Fw + u| &gt; \frac{\lambda}{\rho}\)
+and \({\rm sign}(z) = {\rm sign}(Fw+u)\) to get the update</p>
+
+\[z^* = Fw + u - \frac{\lambda}{\rho} {\rm sign}(Fw + u)\]
+
+<p><br /></p>
+
+<p>When \(z = 0\), we must deal with the discontinuity using subgradients, which is given by \(\partial \| z\|_1 =[-1,1]\). The optimality condition is zero exists within the subgradient. Substituting this into equation \(\ref{eq:L_z}\),</p>
+
+\[0 \in \lambda[-1,1] - \rho (Fw-z+u)\]
+
+<p>which can be rearranged to get the form</p>
+
+\[Fw+u  \in \left[-\frac{\lambda}{\rho},\frac{\lambda}{\rho}\right]\]
+
+<p>In words, \(z=0\) is an optimal solution only when \(Fw+u\) is within the region \(\left[-\frac{\lambda}{\rho},\frac{\lambda}{\rho}\right]\). Combining the results above for \(z \neq 0\) with \(z = 0\), we get the following updates</p>
+
+\[z_{k+1} = 
+\begin{cases}
+   0 &amp;, \quad|Fw_{k+1}+u_k| \leq \frac{\lambda}{\rho} \\
+   Fw_{k+1} + u_k - \frac{\lambda}{\rho} {\rm sign}(w_{k+1}) &amp;, \quad |Fw_{k+1}+u_k| &gt; \frac{\lambda}{\rho}
+\end{cases}\]
+
+<p>More compactly this can be written using the soft-threshold operator \(\mathcal{S}\). The update equation for \(z\) is given by</p>
+
+\[\begin{align*}
+z_{k+1} &amp;= {\rm sign}(Fw_{k+1} + u_k) \max  \left( \left| Fw_{k+1} + u_k \right| - \frac{\lambda}{\rho}, 0 \right) \\
+&amp;= \mathcal{S}_{\lambda/\rho} \left(Fw_{k+1} + u_k  \right)
+\end{align*}\]
+
+<p><!-- Therefore, there are two different cases we encounter when computing the gradient of the --></p>
+
+<hr />
+
+<h5 id="updating-u">Updating \(u\)</h5>
+
+<p>Given the updated \(w_{k+1}\) and \(z_{k+1}\), we perform a gradient ascent update to the dual variables. This is simply given by the running sum of residuals</p>
+
+\[u_{k+1} = u_k + F w_{k+1} - z_{k+1}\]
+
+<hr />
+
+<h3 id="special-cases-of-the-generalized-lasso">Special Cases of the Generalized Lasso</h3>
+
+<p>For different choices of \(F\), we recover several well-studied problems as special cases.</p>
+
+<p><br /><br /></p>
+
+<h6 id="standard-lasso">Standard Lasso</h6>
+
+<p>When \(F\) is an identity matrix \(I\in\mathbb{R}^{n \times n}\), we recover the standard Lasso problem <a class="citation" href="#tibshirani1996regression">[2]</a></p>
+
+\[\min_w \frac{1}{2} \|Dw - y \|_2^2 + \lambda \| w \|_1\]
+
+<p>This model is commonly used in compressed sensing where we are interested in sparse signal recovery, and can be used as a convex relaxation for \(\ell_0\)-norm variable selection problem .</p>
+
+<p><br /><br /></p>
+
+<h6 id="variable-fusion">Variable Fusion</h6>
+
+<p>When \(F \in \mathbb{R}^{(n-1) \times n}\) is a first order difference matrix,</p>
+
+\[F_{ij} = 
+\begin{cases}
+1 &amp;,\quad i = j -1\\
+-1 &amp;,\quad i = j \\
+0 &amp;, \quad {\rm  otherwise}
+\end{cases}\]
+
+<p>we obtain the variable fusion model
+<a class="citation" href="#land1996variable">[3]</a> which corresponds to the problem</p>
+
+\[\min_w \frac{1}{2} \|Dw - y \|_2^2 + \lambda \sum_{i=2}^n \| w_{k} -  w_{k-1}\|_1\]
+
+<p>This model is used when we expect the ordering of the weights to have smooth structure.</p>
+
+<p><br /><br /></p>
+
+<h6 id="fused-lasso">Fused Lasso</h6>
+
+<p>When \(F \in \mathbb{R}^{(2n-1)\times n}\) combines both the penalty from the standard lasso and the variable fusion,</p>
+
+\[F = 
+
+\begin{bmatrix}
+F_{\textrm{Lasso}} \\
+F_{\textrm{Fusion}}
+\end{bmatrix}\]
+
+<p>we obtain the Fused Lasso model <a class="citation" href="#tibshirani2005sparsity">[4]</a> which combines both a sparsity and smoothness penalty.</p>
+
+\[\min_w \frac{1}{2} \|Dw - y \|_2^2 + \lambda_1 \| w \|_1 + \lambda_2 \sum_{i=2}^n \| w_{k} -  w_{k-1}\|_1\]
+
+<h3 id="demo">Demo</h3>
+
+<p>I illustrate the impact of the various penalties mentioned earlier on the inference results. Noisy observations are generated from a random dictionary using smooth and sparse weights. For a given set of hyperparameters, we obtain the following ADMM solutions</p>
+
+<!-- <div class="home-img-container">
+  <img src="assets/img/ADMM-lasso-results.png" width="300px" height="300px" id="ADMM"> 
+</div> -->
+
+<!-- <div class="col-sm mt-3 mt-md-0"> -->
+<!-- </div> -->
+<p><br /></p>
+
+<figure>
+
+  <picture>
+    
+    <source class="responsive-img-srcset" media="(max-width: 480px)" srcset="/yenhochen/assets/img/ADMM-lasso-results-480.webp" />
+    <source class="responsive-img-srcset" media="(max-width: 800px)" srcset="/yenhochen/assets/img/ADMM-lasso-results-800.webp" />
+    <source class="responsive-img-srcset" media="(max-width: 1400px)" srcset="/yenhochen/assets/img/ADMM-lasso-results-1400.webp" />
+    
+
+    <!-- Fallback to the original file -->
+    <img src="/yenhochen/assets/img/ADMM-lasso-results.png" class="admm-figure" width="75%" height="auto" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" />
+
+  </picture>
+
+</figure>
+
+<p>The standard lasso problem encourages shrinkage towards zero of each weight independently. While it accurately captures certain regions with active support, adjacent weights can have large variance.  On the other hand, the variable fusion model prioritizes smooth patterns and effectively identifies distinct areas of smoothness. However, since its penalty does not promote zero shrinkage, it incorrectly identifies that the entire support is active. The fused Lasso model excels in accurately identifying both smoothness and the active support set. Importantly, note that solutions across all models exhibit a bias towards lower magnitudes than the actual weights. This is because \(\ell_1\) inference provides a biased estimate of the weight vector.</p>
+
+<!-- This is a direct result of the soft-thresholding operation. -->
+
+<!-- The variable fusion model encourages smooth structure and correctly finds different regions of smoothness. However, since it's penalty does not encourage shrinkage towards zero, it incorrectly identifies active coefficients (i.e. indices 1-12, 8-36 and 45-50). The fused Lasso model most accurately identifies smoothness and the set of active coefficients. Finally, notice that the optimal solution for all models are biased to have lower magnitude than the true weights.  -->
+
+<p><br /><br /></p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="n">numpy</span> <span class="k">as</span> <span class="n">np</span>
+<span class="kn">import</span> <span class="n">numpy.random</span> <span class="k">as</span> <span class="n">npr</span>
+
+<span class="k">def</span> <span class="nf">soft_threshold</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">thresh</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="p">.</span><span class="nf">sign</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">*</span> <span class="n">np</span><span class="p">.</span><span class="nf">max</span><span class="p">([</span><span class="n">np</span><span class="p">.</span><span class="nf">abs</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">-</span><span class="n">thresh</span><span class="p">,</span> <span class="n">np</span><span class="p">.</span><span class="nf">zeros</span><span class="p">(</span><span class="nf">len</span><span class="p">(</span><span class="n">x</span><span class="p">))],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">ADMM_generalized_lasso</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">lam</span><span class="p">,</span> <span class="n">n_iters</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+    <span class="sh">'''</span><span class="s">
+    y: (m,) array. observation
+
+    D: (m, n) array. dictionary
+
+    F: (k, n) array. constraint matrix
+
+    rho: augmented lagrange multiplier
+
+    lam: lagrange multiplier
+    
+    </span><span class="sh">'''</span>
+
+    <span class="n">n</span> <span class="o">=</span> <span class="nf">len</span><span class="p">(</span><span class="n">D</span><span class="p">.</span><span class="n">T</span><span class="p">)</span>
+
+    <span class="c1"># random initialization
+</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> 
+    <span class="n">u</span> <span class="o">=</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">(</span><span class="nf">len</span><span class="p">(</span><span class="n">F</span><span class="p">))</span> 
+    <span class="n">z</span> <span class="o">=</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">(</span><span class="nf">len</span><span class="p">(</span><span class="n">F</span><span class="p">))</span> 
+    
+    <span class="n">FtF</span> <span class="o">=</span> <span class="n">F</span><span class="p">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">F</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nf">range</span><span class="p">(</span><span class="n">n_iters</span><span class="p">):</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">linalg</span><span class="p">.</span><span class="nf">lstsq</span><span class="p">(</span><span class="n">D</span><span class="p">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">D</span> <span class="o">+</span> <span class="n">rho</span> <span class="o">*</span> <span class="n">FtF</span><span class="p">,</span> <span class="n">D</span><span class="p">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">y</span> <span class="o">+</span> <span class="n">rho</span> <span class="o">*</span> <span class="n">F</span><span class="p">.</span><span class="n">T</span> <span class="o">@</span> <span class="p">(</span><span class="n">z</span><span class="o">-</span><span class="n">u</span><span class="p">),</span> <span class="n">rcond</span><span class="o">=</span><span class="bp">None</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="nf">soft_threshold</span><span class="p">(</span><span class="n">F</span> <span class="o">@</span> <span class="n">w</span> <span class="o">+</span> <span class="n">u</span><span class="p">,</span> <span class="n">lam</span><span class="o">/</span><span class="n">rho</span><span class="p">)</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="n">u</span> <span class="o">+</span> <span class="n">F</span> <span class="o">@</span> <span class="n">w</span> <span class="o">-</span> <span class="n">z</span>
+        
+    <span class="k">return</span> <span class="n">w</span>
+
+<span class="kn">from</span> <span class="n">sklearn.datasets</span> <span class="kn">import</span> <span class="n">make_sparse_coded_signal</span>
+<span class="kn">import</span> <span class="n">matplotlib.pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+
+<span class="n">n</span><span class="p">,</span> <span class="n">m</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">100</span>
+<span class="n">n_nonzero_coefs</span> <span class="o">=</span> <span class="mi">10</span>
+
+<span class="c1"># generate dictionary
+</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="nf">make_sparse_coded_signal</span><span class="p">(</span>
+    <span class="n">n_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">n_components</span><span class="o">=</span><span class="n">n</span><span class="p">,</span>
+    <span class="n">n_features</span><span class="o">=</span><span class="n">m</span><span class="p">,</span>
+    <span class="n">n_nonzero_coefs</span><span class="o">=</span><span class="n">n_nonzero_coefs</span><span class="p">,</span>
+    <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">D</span> <span class="o">=</span> <span class="n">D</span><span class="p">.</span><span class="n">T</span>
+
+
+
+<span class="c1"># generate structured coefficients
+</span>
+<span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="nf">seed</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">w_true</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="nf">zeros</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nf">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+    <span class="n">ix</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="nf">choice</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+    <span class="n">length</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="nf">randint</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span>
+    <span class="n">w_true</span><span class="p">[</span><span class="n">ix</span><span class="p">:</span><span class="n">ix</span><span class="o">+</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">()</span>
+    
+    
+<span class="c1"># generate noisy observations 
+</span>
+<span class="n">y_true</span> <span class="o">=</span> <span class="n">D</span> <span class="o">@</span> <span class="n">w_true</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">y_true</span> <span class="o">+</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">(</span><span class="n">m</span><span class="p">)</span><span class="o">*</span><span class="mf">0.2</span>
+
+
+<span class="c1"># define hyperparameters
+</span>
+<span class="n">rho</span> <span class="o">=</span> <span class="mf">0.3</span> <span class="c1"># augmentation multiplier
+</span>
+<span class="n">lam</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="c1"># general multiplier for L1
+</span>
+<span class="n">lam2</span> <span class="o">=</span> <span class="mf">0.3</span> <span class="c1"># multipler for sparsity in Fused Lasso
+</span>
+
+
+
+<span class="c1"># construct F matrices
+</span>
+<span class="n">F_Lasso</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="nf">eye</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="c1"># Lasso solution
+</span>
+<span class="n">F_fusion</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">diag</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">ones</span><span class="p">(</span><span class="n">n</span><span class="p">),</span><span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">np</span><span class="p">.</span><span class="nf">diag</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">ones</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">*-</span><span class="mi">1</span><span class="p">,</span><span class="n">k</span><span class="o">=</span><span class="mi">0</span><span class="p">))[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="c1"># Fusion Penalty solution
+</span>
+<span class="n">F_fusedLasso</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="nf">concatenate</span><span class="p">([</span><span class="n">np</span><span class="p">.</span><span class="nf">diag</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">ones</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">/</span><span class="n">lam</span><span class="o">*</span><span class="n">lam2</span><span class="p">),</span> <span class="n">F_fusion</span><span class="p">])</span> <span class="c1"># Fused Lasso solution
+</span>
+
+<span class="c1"># compute ADMM solution
+</span>
+<span class="n">w_lasso</span> <span class="o">=</span> <span class="nc">ADMM_generalized_lasso</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F_Lasso</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">lam</span><span class="p">)</span>
+<span class="n">w_fusion</span> <span class="o">=</span> <span class="nc">ADMM_generalized_lasso</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F_fusion</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">lam</span><span class="p">)</span>
+<span class="n">w_fusedLasso</span> <span class="o">=</span> <span class="nc">ADMM_generalized_lasso</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F_fusedLasso</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">lam</span><span class="p">)</span>
+
+
+    
+<span class="c1"># Plot
+</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">w_lasso</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">"</span><span class="s">Lasso</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">w_fusion</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">"</span><span class="s">Fusion</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">w_fusedLasso</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">"</span><span class="s">Fused Lasso</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">w_true</span><span class="p">,</span> <span class="sh">'</span><span class="s">k--</span><span class="sh">'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">"</span><span class="s">true</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">ylabel</span><span class="p">(</span><span class="sh">"</span><span class="s">Weight</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">xlabel</span><span class="p">(</span><span class="sh">"</span><span class="s">index</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">show</span><span class="p">()</span>
+    
+
+</code></pre></div></div>
+
+<hr />
+
+<ol class="bibliography font-size-blog-ref"><li>  
+
+  Ryan J Tibshirani. "The solution path of the generalized lasso".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  2011.
+  
+
+
+</li>
+<li>  
+
+  Robert Tibshirani. "Regression shrinkage and selection via the lasso".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  <em>Journal of the Royal Statistical Society Series B: Statistical Methodology</em>, 1996.
+  
+
+
+</li>
+<li>  
+
+  S Land,&nbsp;and&nbsp;J Friedman. "Variable fusion: a new method of adaptive signal regression".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  <em>Technical Report, Department of Statistics, Stanford University</em>, 1996.
+  
+
+
+</li>
+<li>  
+
+  Robert Tibshirani,&nbsp;Michael Saunders,&nbsp;Saharon Rosset,&nbsp;Ji Zhu,&nbsp;and&nbsp;Keith Knight. "Sparsity and smoothness via the fused lasso".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  <em>Journal of the Royal Statistical Society Series B: Statistical Methodology</em>, 2005.
+  
+
+
+</li></ol>]]></content><author><name></name></author><summary type="html"><![CDATA[L1 penalized inference is central to the field of compressed sensing. I derive an ADMM solver for the generalized Lasso problem and discuss three important special cases; standard lasso, variable fusion, and fused lasso. Further, I provide python code and demonstrate it on a simulated dataset.]]></summary></entry><entry><title type="html">Alternating Directions Method of Multipliers</title><link href="http://localhost:4000/yenhochen/blog/2023/Alternating-Directions-Method-of-Multipliers/" rel="alternate" type="text/html" title="Alternating Directions Method of Multipliers" /><published>2023-08-19T15:53:00-04:00</published><updated>2023-08-19T15:53:00-04:00</updated><id>http://localhost:4000/yenhochen/blog/2023/Alternating%20Directions%20Method%20of%20Multipliers</id><content type="html" xml:base="http://localhost:4000/yenhochen/blog/2023/Alternating-Directions-Method-of-Multipliers/"><![CDATA[<hr />
+
+<p>Alternating Directions Method of Multipliers (ADMM) <a class="citation" href="#boyd2011distributed">[1]</a> is an effective class of iterative optimization algorithms that are particularly well-suited towards separable and non-smooth objectives. The core idea is to break down a complex optimization problem into simple tractable subproblems. Most generally, ADMM targets objectives of the form</p>
+
+\[\DeclareMathOperator*{\argmin}{arg\,min}
+\begin{equation}
+\min_x f(x) + g(z) \quad
+\textrm{ subject to }
+Ax + Bz = c
+\end{equation}\]
+
+<p>for variables \(x \in \mathbb{R}^n\) and \(z \in \mathbb{R}^p\). Equality constraints are encoded through \(A \in \mathbb{R}^{k \times n}\), \(B \in \mathbb{R}^{k \times p}\), and \(c\in\mathbb{R}^k\).
+ <!-- $$z$$ is sometimes referred to as a slack variable since it allows deviatation from the  -->
+For a convex optimization problem, one strategy for separating the objective is to define \(f(x)\) to contain all the smooth terms and \(g(z)\) to contain all the non-smooth terms. This decomposition allows us to split minimization over \(x\) and \(z\) into two steps, where each step often consists of a simple closed form update.</p>
+
+<p><br />
+ADMM then proceeds by forming the Augmented Lagrangian \(L\) which has the general form</p>
+
+\[L(x,z,y) = f(x) + g(z) + y^\top (Ax+Bz-c) + \frac{\rho}{2} \| Ax+Bz-c \|_2^2\]
+
+<p>where \(\rho &gt; 0\). The above is the <em>unscaled</em> Augmented Lagrangian. However, it is often more convenient to work in its <em>scaled</em> form. Let \(r =  Ax+Bz-c\). The last two terms can be combined as</p>
+
+\[\begin{alignat*}{2}
+y^\top r + \frac{\rho}{2} \| r \|_2^2 &amp;= y^\top r + \frac{\rho}{2} r^\top r \\
+&amp;=  -2{ \left( -\frac{1}{2} y \right)}^\top r + \frac{\rho}{2} r^\top r \\
+&amp;= \frac{\rho}{2} \left(r+\frac{2}{\rho} \frac{1}{2} y \right)^\top \left(r+\frac{2}{\rho} \frac{1}{2} y \right) - \frac{2}{\rho} \left(\frac{1}{2} y \right)^\top \left(\frac{1}{2} y \right) \\
+  &amp;= \frac{\rho}{2} \| r+\frac{1}{\rho}  y  \|_2^2 
+ - \frac{1}{2\rho}  \| y \|_2^2  \\
+   &amp;= \frac{\rho}{2} \| r+  u  \|_2^2 
+ - \frac{\rho}{2}  \|  u \|_2^2  \\
+\end{alignat*}\]
+
+<p>where \(u=\frac{1}{\rho} y\) is the scaled dual variable. Lines 3 comes directly from completing the square (Proposition 1 from <a class="citation" href="#rosenberg2017completing">[2]</a>). All together, the scaled form of the augmented Lagrangian is given by</p>
+
+\[\begin{equation}
+L(x,z,u) = f(x) + g(z) + \frac{\rho}{2} \| Ax+Bz-c +  u  \|_2^2 
+ - \frac{\rho}{2}  \|  u \|_2^2
+ \end{equation}\]
+
+<p><br /></p>
+
+<p>From here, we perform block minimization under the scaled \(L\). This consists of iterating between a primal variable minimization step, a slack variable minimization step, and a gradient ascent update on the dual scaled variables.</p>
+
+\[\begin{alignat}{3}
+1.&amp; \quad x_{k+1} \quad &amp;= \quad &amp;\argmin_x \hspace{0.5em} L (x, z_k, u_k) \\
+2.&amp; \quad z_{k+1} \quad &amp;= \quad &amp;\argmin_z \hspace{0.5em} L (x_{k+1}, z, u_k)\\
+3.&amp; \quad u_{k+1} \quad &amp;= \quad &amp;u_k + Ax+Bz-c \\
+\end{alignat}\]
+
+<p><br /></p>
+
+<!-- [Discussion on the step-size for $$u$$. Primal Dual Feasability. step-size of 1 is a good choice!] -->
+
+<hr />
+
+<ol class="bibliography font-size-blog-ref"><li>  
+
+  Stephen Boyd,&nbsp;Neal Parikh,&nbsp;Eric Chu,&nbsp;Borja Peleato,&nbsp;Jonathan Eckstein,&nbsp;and&nbsp; others. "Distributed optimization and statistical learning via the alternating direction method of multipliers".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  <em>Foundations and Trends\textregistered in Machine learning</em>, 2011.
+  
+
+
+</li>
+<li>  
+
+  David S Rosenberg. "Completing the Square".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  2017.
+  
+
+
+</li></ol>]]></content><author><name></name></author><summary type="html"><![CDATA[Complex optimization problems can often be approached by splitting them up into tractable subproblems. I describe an approach where local solutions are coordinated to find a global solution.]]></summary></entry><entry><title type="html">Interactive Transposed Convolution Tool</title><link href="http://localhost:4000/yenhochen/blog/2023/transposed-conv/" rel="alternate" type="text/html" title="Interactive Transposed Convolution Tool" /><published>2023-07-01T15:53:00-04:00</published><updated>2023-07-01T15:53:00-04:00</updated><id>http://localhost:4000/yenhochen/blog/2023/transposed-conv</id><content type="html" xml:base="http://localhost:4000/yenhochen/blog/2023/transposed-conv/"><![CDATA[<hr />
+
+<p>Many computer vision tasks rely on convolutional and pooling layers to extract meaningful features from images. These operations often reduce the dimsionality of the features which can be computationally practical when training very deep models (e.g. less parameters to train) and enables learning important spatial hierarchies.
+<!-- by increasing the size of the receptive field for downstream layers.  -->
+While defining an operation that summarizes information can be accomplished through familiar functions such as summing, averaging, or taking the max or min, the converse operation of expanding the dimensionality of image features is not as intuitive.</p>
+
+<p><br /></p>
+
+<p>Below, I present an interactive tool where one can explore how each parameter of the transposed convolution, denoted as \(\star \star\), affects the output. Hovering over each entry of the output shows its corresponding dot product from the input. When exploring, we see that the parameters behave much differently from standard convolution.
+<!-- exploration reveals that these parameters exhibit intriguing behaviors distinct from those in standard convolution -->
+For instance, increasing the padding surpringly results in a smaller output, and larger kernels correspond to more padding around the input. There’s even an extra padding parameter not usually found in regular convolution.</p>
+
+<!-- Very quickly, it becomes clear that the parameters behave very differently from what one would expect from standard convolution. -->
+
+<p><br />
+ <!-- discussion closely follows the example provided by [^fn], but is more pedantic --></p>
+
+<p><br /></p>
+
+<div>
+    <br /><br /><br />
+    <!-- injected some text from a separate html file -->
+
+    <div class="slider-container">
+        <div class="parameter">Width:</div>
+        <div class="slider-div"><input class="slider" type="range" min="1" max="5" value="5" step="1" id="slider-w" oninput="onInputW(this.value)" /></div>
+        <div class="slider-text" id="range-width">5</div>
+
+
+        <div class="parameter">Height:</div>
+        <div class="slider-div"><input class="slider" type="range" min="1" max="5" value="5" step="1" id="slider-h" oninput="onInputH(this.value)" /></div>
+        <div class="slider-text" id="range-height">5</div>
+
+        <div class="parameter">Kernel:</div>
+        <div class="slider-div"><input class="slider" type="range" min="1" max="5" value="3" step="1" id="slider-k" oninput="onInputKernel(this.value)" /></div>
+        <div class="slider-text" id="range-kernel">3</div>
+
+        <div class="parameter">Stride:</div>
+        <div class="slider-div"><input class="slider" type="range" min="1" max="3" value="1" step="1" id="slider-s" oninput="onInputStride(this.value)" /></div>
+        <div class="slider-text" id="range-stride">1</div>
+
+        <div class="parameter">Padding:</div>
+        <div class="slider-div"><input class="slider" type="range" min="0" max="3" value="0" step="1" id="slider-p" oninput="onInputPadding(this.value)" /></div>
+        <div class="slider-text" id="range-padding">0</div>
+
+        <div class="parameter">Output Padding:</div>
+        <div class="slider-div"><input class="slider" type="range" min="0" max="3" value="0" step="1" id="slider-op" oninput="onInputOutPad(this.value)" /></div>
+        <div class="slider-text" id="range-outpad">0</div>
+
+        <div class="parameter">Dilation:</div>
+        <div class="slider-div"><input class="slider" type="range" min="1" max="2" value="1" step="1" id="slider-d" oninput="onInputDilation(this.value)" /></div>
+        <div class="slider-text" id="range-dilation">1</div>
+    </div>
+    <br /><br />
+    
+    
+    <div class="center-container">Hover over the output to highlight corresponding convolution</div>
+
+    <br />
+
+</div>
+<script>
+
+function onInputW(val) {
+    document.getElementById("range-width").innerHTML = val;
+}
+
+function onInputH(val) {
+    document.getElementById("range-height").innerHTML = val;
+}
+
+function onInputKernel(val) {
+    document.getElementById("range-kernel").innerHTML = val;
+}
+
+function onInputStride(val) {
+    document.getElementById("range-stride").innerHTML = val;
+}
+
+function onInputPadding(val) {
+    document.getElementById("range-padding").innerHTML = val;
+}
+
+function onInputDilation(val) {
+    document.getElementById("range-dilation").innerHTML = val;
+}
+
+
+function onInputOutPad(val) {
+    document.getElementById("range-outpad").innerHTML = val;
+}
+
+</script>
+
+<div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js" charset="utf-8"></script>
+    <script src="https://d3js.org/d3.v6.min.js" charset="utf-8"></script>
+    <!-- https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js -->
+    <div class="d3post1"></div>
+    
+        <script type="text/javascript">
+            // create data. Resolution of the data
+var nx = 5;
+var ny = 5;
+var tilewidth = 7;
+var tileheight = 7;
+var paddingx = 3;
+var paddingy =3;
+var kernel = 3;
+var stride = 1;
+var padding = 0;
+var outpad = 0;
+var dilation = 1;
+
+
+var offx = 10;
+var offy = 70;
+
+var matrix_pad = 74; 
+
+var nx_out, ny_out = compute_outsize(nx, ny, kernel, stride, padding, dilation, outpad)
+var wx, wy, ox, oy, nx_int, ny_int, otx, oty = get_offset(nx, ny, kernel, stride, padding, offx, offy, nx_out, ny_out, dilation, outpad)
+
+let width = wx.reduce((a, b) => a + b, 0)+matrix_pad*4
+const svg = d3.select(".d3post1")
+              .append("svg")
+              .attr("width", width)
+              .attr("height", 400);
+
+var text = ["★★", "=","★", "=", "Transposed Conv.", "Conv. Formulation", "Output", "5x5", "9x9", "7x7"]
+
+// d3.select()
+
+
+
+var img_color = "#b23a48"
+var kernel_color = "#F1A253"
+var int_color = "#4A6793"
+var out_color = "#39A482"
+var gray_color = "#B9B9B9"
+var scale = chroma.scale(['124559',"62b6cb", "9bf6ff"]).mode("hsl")
+
+data = makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+
+// draw on svg
+updateText(otx)
+updateRectangles(data)
+
+
+d3.select("#slider-k")
+    .on("input", d=>{
+     kernel = d3.select("#slider-k").node().value
+     new_data = makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+     updateRectangles(new_data);
+ })
+
+d3.select("#slider-k")
+   .on("input", d=>{
+    kernel = d3.select("#slider-k").node().value
+    new_data = makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+    updateRectangles(new_data);
+})
+
+d3.select("#slider-w")
+   .on("input", d=>{
+    nx = d3.select("#slider-w").node().value
+    new_data = makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+    updateRectangles(new_data);
+})
+
+d3.select("#slider-h")
+   .on("input", d=>{
+    ny = d3.select("#slider-h").node().value
+    new_data = makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+    updateRectangles(new_data);
+})
+
+d3.select("#slider-s")
+   .on("input", d=>{
+    stride = d3.select("#slider-s").node().value
+    new_data = makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+    updateRectangles(new_data);
+})
+
+d3.select("#slider-p")
+   .on("input", d=>{
+    padding = d3.select("#slider-p").node().value
+    new_data = makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+    updateRectangles(new_data);
+})
+
+
+d3.select("#slider-d")
+   .on("input", d=>{
+    dilation = d3.select("#slider-d").node().value
+    new_data = makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+    updateRectangles(new_data);
+})
+
+
+d3.select("#slider-op")
+   .on("input", d=>{
+    outpad = d3.select("#slider-op").node().value
+    
+    new_data = makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+    updateRectangles(new_data);
+})
+
+function createcolorsf(n_colors, f_color){
+    let colors = []
+    for(let i=0; i< n_colors; i++){
+        colors.push({"color":f_color(i/n_colors).hex()})
+    }
+    return colors
+}
+
+
+function createcolors(n_colors, color){
+    let colors = []
+    for(let i=0; i< n_colors; i++){
+        colors.push({"color":color})
+    }
+    return colors
+}
+
+
+
+function makefullData(nx, ny, offx, offy, kernel, stride, padding, dilation, outpad){
+
+    nx = parseInt(nx)
+    ny = parseInt(ny)
+    kernel = parseInt(kernel)
+    stride = parseInt(stride)
+    padding = parseInt(padding)
+    dilation = parseInt(dilation)
+    outpad = parseInt(outpad)
+
+
+    // console.log("MAKE FULL DATA", nx, ny, offx, offy, kernel, stride, padding, dilation, outpad)
+    // console.log("TYPEOF", typeof nx)
+    nx_out, ny_out = compute_outsize(nx, ny, kernel, stride, padding, dilation, outpad)
+    wx, wy, ox, oy, nx_int, ny_int, otx, oty = get_offset(parseInt(nx), parseInt(ny), kernel, stride, padding, offx, offy, nx_out, ny_out, dilation, outpad)
+    nx_int = parseInt(nx_int)
+    ny_int = parseInt(ny_int)
+
+    console.log("INTERMETDIATE", nx_int, ny_int)
+
+    // console.log(wx, wy, ox, oy, nx_int, ny_int, otx, oty, "asdfg4r")
+
+
+    let width = wx.reduce((a, b) => a + b, 0)+matrix_pad*4+50
+    svg.attr("width", width)
+
+
+    updateText(otx);
+    
+
+    data_img = createData(nx, ny, ox[0], oy[0], 0)
+    data_kernel1 = createData(kernel, kernel, ox[1], oy[1], 1)
+    data_int = createData(nx_int, ny_int, ox[2], oy[2], 2)
+    data_kernel2 = createData(kernel, kernel, ox[3], oy[3],3)
+    data_out = createData(nx_out, ny_out, ox[4], oy[4],4)
+    data = [...data_img, ...data_kernel1, ...data_int, ...data_kernel2, ...data_out]
+
+    img_colors = createcolors(data_img.length, img_color)
+    // k1_colors = createcolors(data_kernel1.length, kernel_color)
+    int_colors = createcolors(data_int.length, img_color)
+    out_colors = createcolors(data_out.length, out_color)
+
+    k1_colors = createcolorsf(data_kernel1.length, scale)
+    k2_colors = [...k1_colors].reverse()
+
+    var z = stride-1;
+    var p_prime = dilation*(kernel-1)-padding+outpad;
+    
+    console.log("nxny", nx, ny)
+    int_colors.forEach((e,i)=>{
+        // gray out side padding
+        if(data_int[i].ix < p_prime || data_int[i].ix >= nx+p_prime+z*(nx-1)){
+            int_colors[i].color = gray_color
+        }
+        if(data_int[i].iy < p_prime || data_int[i].iy >= ny+p_prime+z*(ny-1)){
+            int_colors[i].color = gray_color
+        }
+
+         // gray out internal padding        
+         if(data_int[i].ix > p_prime && (data_int[i].ix-p_prime)%stride != 0 ){
+            int_colors[i].color = gray_color
+        }
+        if(data_int[i].iy > p_prime &&  (data_int[i].iy-p_prime )%stride!=0){
+            int_colors[i].color = gray_color
+        }
+    })
+
+    var color_data = [...img_colors, ...k1_colors, ...int_colors, ...k2_colors, ...out_colors]
+
+    data.forEach((e,i)=>{
+        data[i] = {...data[i], ...color_data[i]}
+    })
+
+    return data
+}
+
+
+function updateText(otx){
+
+
+    text_data = []
+
+    for(let i=0; i < otx.length; i++){
+    text_data.push({"otx": otx[i],
+                    "oty": oty[i],
+                    "text": text[i]})
+    }
+
+
+
+    svg.selectAll("text")
+              .data(text_data)
+              .join("text")
+              .attr("x", d=>{return d.otx})
+              .attr("y", d=>{return d.oty})
+              .text(d=>{return d.text})
+              .attr("text-anchor", "middle")
+              .attr("alignment-baseline", "middle")
+
+}
+
+function updateRectangles(data){
+
+    kernel = parseInt(kernel)
+    outpad = parseInt(outpad)
+    dilation = parseInt(dilation)
+
+    svg.selectAll("rect")
+        .data(data)
+        .join("rect")
+        .attr("x", d=>{return d.x})
+        .attr("y", d=>{return d.y})
+        .attr("ix", d=>{return d.ix})
+        .attr("iy", d=>{return d.iy})
+        .attr("m", d=>{return d.m})
+        .attr('stroke', 'black')
+        .attr("stroke-width", 1)
+        .attr('fill', d=>{return d.color})
+        .attr('width', tilewidth)
+        .attr('height', tileheight)
+        .on("mouseover",function(e,d){
+            // console.log(e, d)
+            if (d3.select(this).attr("m") == 4){
+                d3.select(this)
+                  .attr("stroke-width", 2.5)
+
+                let out_x = parseInt(d3.select(this).attr("ix"))
+                let out_y = parseInt(d3.select(this).attr("iy"))
+                console.log(out_x)
+
+                console.log("sdfvb", kernel)
+
+                for(let i=0; i<dilation*kernel; i=i+dilation){
+                    for(let j=0; j<dilation*kernel; j=j+dilation){
+                        let intx = out_x+i+outpad;
+                        let inty = out_y+j+outpad;
+                        let r = d3.select(`rect[m='2'][ix='${intx}'][iy='${inty}']`)
+                          .attr("stroke-width", 2.5)
+                        // console.log(`rect[m='2'][ix='${intx}'][iy='${inty}']`)
+                        // console.log(r)
+                    }
+                }
+                
+                
+
+            }
+
+
+        })
+        .on("mouseout",function(e,d){
+            // console.log(e, d)
+            d3.select(this)
+              .attr("stroke-width", 1)
+
+              let out_x = parseInt(d3.select(this).attr("ix"))
+                let out_y = parseInt(d3.select(this).attr("iy"))
+
+                for(let i=0; i<dilation*kernel; i=i+dilation){
+                    for(let j=0; j<dilation*kernel; j=j+dilation){
+                        let intx = out_x+i+outpad;
+                        let inty = out_y+j+outpad;
+                        let r = d3.select(`rect[m='2'][ix='${intx}'][iy='${inty}']`)
+                          .attr("stroke-width", 1)
+                        // console.log(`rect[m='2'][ix='${intx}'][iy='${inty}']`)
+                        // console.log(r)
+                    }
+                }
+        })
+}
+
+
+function createData(nx, ny, offsetx, offsety, m){
+
+    data = []
+    for(let j = 0; j < ny; j++){
+    for (let i = 0; i < nx; i++) {
+        
+            data.push({
+                "x": i*(tilewidth + paddingx)+offsetx,
+                "y": j*(tileheight + paddingy)+offsety,
+                "ix": i,
+                "iy": j,
+                "m": m
+            })
+        }
+    }
+    return data
+}
+
+
+function get_offset(nx, ny, kernel, stride, padding, offx, offy, nx_out, ny_out, dilation, outpad){
+
+    var z = stride-1;
+    var p_prime = dilation*(kernel-1)-padding +outpad;
+    // console.log("nx", nx, ny, p_prime, z) # ok
+    ny_int = ((ny-1)*z+ny)+p_prime*2;
+    nx_int = ((nx-1)*z+nx)+p_prime*2;
+    // console.log("intermediate_size", nx_int, ny_int)
+    // var nx_int = ((ny-1)*z+ny);
+    // var ny_int = ((nx-1)*z+nx);
+
+    var wx1 = nx*(tilewidth+paddingx)
+    var wx2 = kernel*(tilewidth+paddingx)
+    var wx3 = nx_int*(tilewidth+paddingx)
+    var wx4 = wx2
+    var wx5 = nx_out*(tilewidth+paddingx)
+
+    wx = [wx1, wx2, wx3, wx4, wx5]
+
+
+    var wy1 = ny*(tileheight+paddingy)
+    var wy2 = kernel*(tileheight+paddingy)
+    var wy3 = ny_int*(tileheight+paddingy)
+    var wy4 = wy2
+    var wy5 = ny_out*(tileheight+paddingy)
+
+    wy = [wy1, wy2, wy3, wy4, wy5]
+
+    var wx_max = Math.max(...wx)
+    var wy_max = Math.max(...wy)
+    var maxy_i = wy.indexOf(Math.max(...wy));
+
+
+    var ox1 = offx;
+    var ox2 = ox1 + wx1 + matrix_pad;
+    var ox3 = ox2 + wx2 + matrix_pad;
+    var ox4 = ox3 + wx3 + matrix_pad;
+    var ox5 = ox4 + wx4 + matrix_pad;
+
+    ox = [ox1, ox2, ox3, ox4, ox5]
+
+    var oy1 = offy+wy_max/2-wy1/2;
+    var oy2 = offy+wy_max/2-wy2/2;
+    var oy3 = offy+wy_max/2-wy3/2;
+    var oy4 = offy+wy_max/2-wy4/2;
+    var oy5 = offy+wy_max/2-wy5/2;
+
+
+    var otx1 = offx+wx1 + matrix_pad/2
+    var otx2 = ox2 + wx2 + matrix_pad/2
+    var otx3 = ox3 + wx3 + matrix_pad/2
+    var otx4 = ox4 + wx4 + matrix_pad/2
+    var otx5 = otx1+10
+    var otx6 = otx3
+    var otx7 = ox4 + wx4 + matrix_pad + wx5/2
+
+    var oty1 = offy + wy_max/2
+    var oty2 = offy + wy_max/2
+    var oty3 = offy + wy_max/2
+    var oty4 = offy + wy_max/2
+    var oty5 = 10
+    var oty6 = 10
+    var oty7 = 10
+
+    oy = [oy1, oy2, oy3, oy4, oy5]
+    otx = [otx1, otx2, otx3, otx4, otx5, otx6, otx7]
+    oty = [oty1, oty2, oty3, oty4, oty5, oty6, oty7]
+
+    return wx, wy, ox, oy, nx_int, ny_int, otx, oty
+}
+
+function compute_outsize(nx, ny, kernel, stride, padding, dilation, outpad){
+    nx = parseInt(nx)
+    ny = parseInt(ny)
+    kernel = parseInt(kernel)
+    stride = parseInt(stride)
+    padding = parseInt(padding)
+    dilation = parseInt(dilation)
+    outpad = parseInt(outpad)
+
+    nx_out = (nx-1)*stride-2*padding+dilation*(kernel-1) + outpad + 1
+    ny_out = (ny-1)*stride-2*padding+dilation*(kernel-1) + outpad + 1
+    return nx_out, ny_out
+}
+
+        </script>
+    
+</div>
+
+<p><br /></p>
+
+<p>My goal with this post is to give a better sense of where the transposed convolution comes from and how it can be related to operations that we are familiar with. The discussion below closely follows the example in <a class="citation" href="#dumoulin2016guide">[1]</a>, but includes insights from other resources to hopefully give a more complete picture.</p>
+
+<hr />
+
+<h3 id="convolution-is-a-linear-operation">Convolution is a Linear Operation</h3>
+
+<p>Most often, the convolution, denoted as \(\star\), is depicted as a kernel \(W\) sliding over the input data \(X\), computing dot products at each position to produce a lower-dimensional output \(Y\). Equivalently, the convolution can be written as simple matrix-vector multiplication</p>
+
+\[Y =X \star W  = \widetilde{W} \widetilde{x}\]
+
+<p>where \(\widetilde{W}\) and \(\widetilde{x}\) are augmentations of the original kernel and input data. For example, consider a convolution between a \(3\times 3\) kernel over a  \(4 \times 4\) input.</p>
+
+\[X \star W = 
+
+
+\begin{bmatrix}
+   x_{00} &amp; x_{01} &amp; x_{02} &amp; x_{03}\\
+   x_{10} &amp; x_{11} &amp; x_{12} &amp; x_{13}\\
+   x_{20} &amp; x_{21} &amp; x_{22} &amp; x_{23}\\
+   x_{30} &amp; x_{31} &amp; x_{32} &amp; x_{33}
+\end{bmatrix}
+
+\star
+
+\begin{bmatrix}
+   w_{00} &amp; w_{01} &amp; w_{02}\\
+   w_{10} &amp; w_{11} &amp; w_{12}\\
+   w_{20} &amp; w_{21} &amp; w_{22}
+\end{bmatrix}\]
+
+<p>To obtain the matrix-vector representation, we row-order flatten the input data into a vector \(\widetilde{x}\) and rewrite the kernel as a sparse matrix using the elements of \(\widetilde{W}\). The exact structure of the sparsity depends on the parameters of the convolution. If we assume that the stride is 1, dilation is 1, and padding is 0, then we get the following augmentated representation.</p>
+
+\[\begin{equation*}
+\begin{split}
+
+\widetilde{W} \widetilde{x} = 
+
+\begin{bmatrix}
+   w_{00} &amp; w_{01} &amp; w_{02} &amp; 0 &amp; w_{10} &amp; w_{11} &amp; w_{12} &amp; 0 &amp; w_{20} &amp; w_{21} &amp; w_{22} &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
+   0 &amp; w_{00} &amp; w_{01} &amp; w_{02} &amp; 0 &amp; w_{10} &amp; w_{11} &amp; w_{12} &amp; 0 &amp;w_{20} &amp; w_{21} &amp; w_{22} &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
+   0 &amp; 0 &amp; 0 &amp; 0 &amp; w_{00} &amp; w_{01} &amp; w_{02} &amp; 0 &amp; w_{10} &amp; w_{11} &amp; w_{12} &amp; 0 &amp; w_{20} &amp; w_{21} &amp; w_{22} &amp; 0\\
+   0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; w_{00} &amp; w_{01} &amp; w_{02} &amp; 0 &amp; w_{10} &amp; w_{11} &amp; w_{12} &amp; 0 &amp;w_{20} &amp; w_{21} &amp; w_{22} \\
+\end{bmatrix}
+
+\begin{bmatrix}
+   x_{00} \\ 
+   x_{01} \\ 
+   x_{02} \\ 
+   x_{03}\\
+   x_{10} \\ 
+   x_{11} \\ 
+   x_{12} \\ 
+   x_{13}\\
+   x_{20} \\ 
+   x_{21} \\ 
+   x_{22} \\ 
+   x_{23}\\
+   x_{30} \\ 
+   x_{31} \\ 
+   x_{32} \\ 
+   x_{33}
+\end{bmatrix}
+
+\end{split}
+\end{equation*}\]
+
+<p><br /></p>
+
+<hr />
+
+<h3 id="forward-and-backward-pass-of-linear-operators">Forward and Backward Pass of Linear Operators</h3>
+
+<p>The main insight from the previous section is that convolution is simply a linear operation with a very specific type of structure in the weight matrix. Therefore, we can analyze it like a linear layer. Let’s take another look at the convolution \(y=\widetilde{W}\widetilde{x}\), paying closer attention to how the dimensionality changes. In our example, \(M=16\) and \(N=4\).</p>
+
+<p><br /></p>
+
+<p>In the forward pass, a high dimensional vector \(\widetilde{x} \in \mathbb{R}^{M \times 1}\) is mapped onto a low dimensional vector \(y \in \mathbb{R}^{N \times 1}\) by the augmented kernel \(\widetilde{W} \in \mathbb{R}^{N \times M}\).</p>
+
+<p><br /></p>
+
+<p>In the backward pass, we compute the partial derivative of each matrix with respect to some loss \(l\). The derivative with respect to the data shows how information is propogated through the convolution, and is given by</p>
+
+\[\begin{equation*}
+\frac{\partial l}{\partial \tilde{x}} = \frac{\partial y}{\partial \tilde{x}} \frac{\partial l}{\partial y} = \widetilde{W}^\top \frac{\partial l}{\partial y}
+\end{equation*}\]
+
+<p>A careful derivation of this result can be found in <a class="citation" href="#johnson-notes-backprop">[2]</a>. Here, a low-dimensional vector \(\frac{\partial l}{\partial y} \in \mathbb{R}^{N\times 1}\) is mapped to a high dimensional vector \(\frac{\partial l}{\partial \tilde{x}} \in \mathbb{R}^{M\times 1}\) using \(\widetilde{W}^\top\), or the transpose of the augmented kernel.</p>
+
+<p><br /></p>
+
+<p>Notice that while \(\widetilde{W}\) reduces the dimensionality in the forward pass, its transpose \(\widetilde{W}^\top\) expands the dimensionality in the backward pass. Importantly, both the forward and backward operations are defined by the same kernel.</p>
+
+<p><br /> <br /> <br /> <br /></p>
+
+<hr />
+
+<h3 id="from-convolution-to-transposed-convolution-and-back">From Convolution to Transposed Convolution and Back</h3>
+
+<p>If we swap the forward and backward passes of the standard convolution, then we get the Transposed Convolution, denoted as \(\star \star\). By using the transpose of the augmented kernel as the forward operation, we achieve a dimensionality expansion in the outputs. It follows that on the backwards pass, the gradients of the loss undergo a dimensionality reduction, since \((\widetilde{W}^\top)^\top = \widetilde{W}\).</p>
+
+<p><br /></p>
+
+<p>Let’s see an example. Consider a low-dimensional input \(X \in \mathbb{R}^{2 \times 2}\)  and a kernel \(W\in\mathbb{R}^{3\times 3}\). The corresponding row-order flattened data vector is given by \(\widetilde{x} \in \mathbb{R}^{4\times 1}\). Its transposed convolution has the following matrix-vector form</p>
+
+\[\begin{equation}
+\label{eq:convT-matrix}
+Y =  X \star \star \hspace{0.3em} W = \widetilde{W}^\top \tilde{x} = 
+
+\begin{bmatrix}
+    w_{00} &amp;  0 &amp; 0 &amp; 0 \\
+    w_{01} &amp; w_{00} &amp; 0 &amp; 0 \\
+    w_{02} &amp; w_{01} &amp; 0 &amp; 0 \\
+    0 &amp; w_{02} &amp;  0 &amp;0 \\
+    w_{10} &amp; 0 &amp;  w_{00} &amp; 0 \\
+    w_{11} &amp; w_{10} &amp; w_{01} &amp;  w_{00} \\
+    w_{12} &amp; w_{11} &amp; w_{02} &amp; w_{01} \\
+    0 &amp; w_{12} &amp; 0 &amp; w_{02} \\
+    w_{20} &amp; 0 &amp; w_{10} &amp; 0 \\
+    w_{21} &amp; w_{20} &amp; w_{11} &amp; w_{10} \\
+    w_{22} &amp; w_{21} &amp; w_{12} &amp; w_{11} \\
+    0 &amp;  w_{22} &amp; 0 &amp; w_{12} \\
+    0 &amp; 0 &amp; w_{20} &amp;  0 \\
+    0 &amp; 0 &amp; w_{21} &amp;  w_{20} \\
+    0 &amp; 0 &amp; w_{22} &amp;  w_{21} \\
+    0 &amp; 0 &amp; 0 &amp;       w_{22} \\            
+\end{bmatrix}
+
+\begin{bmatrix}
+   x_{00} \\ 
+   x_{01} \\ 
+   x_{10} \\ 
+   x_{11} \\
+\end{bmatrix}
+\end{equation}\]
+
+<p>Notice that the 4 dimensional input has been mapped to a 16 dimensional output. Interestingly, we can also show that any transposed convolution has a corresponding standard convolution form. This arises because the backward pass, being a linear operation, can be viewed as a convolution itself. Consider the following convolution</p>
+
+\[\begin{equation}
+\label{eq:convT_conv_form}
+X' \star W' =
+\begin{bmatrix}
+   0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
+   0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
+   0 &amp; 0 &amp; x_{00} &amp; x_{01} &amp; 0 &amp; 0\\ 
+   0 &amp; 0 &amp; x_{10} &amp; x_{11} &amp; 0 &amp; 0 \\
+   0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
+   0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
+\end{bmatrix}
+
+\star
+
+
+\begin{bmatrix}
+   w_{22} &amp; w_{21} &amp; w_{20}\\
+   w_{12} &amp; w_{11} &amp; w_{10}\\
+   w_{02} &amp; w_{01} &amp; w_{00}
+\end{bmatrix}
+\end{equation}\]
+
+<p>where \(X'\) is the data matrix with padding equal to the kernel size minus 1 and \(W'\) is the flip of the original kernel. Taking a stride of 1 and dilation of 1, it is easy to see that every inner product in equation \(\ref{eq:convT_conv_form}\) corresponds to a single row times vector operation in equation \(\ref{eq:convT-matrix}\). In fact, both forms are equivalent up to a reshape.</p>
+
+\[Y =  X \star \star \hspace{0.3em} W  = X' \star W'   = {\rm reshape}(\widetilde{W}^\top \tilde{x})\]
+
+<!-- We can reshape this output into its correspond $$4\times 4$$ matrix form. -->
+
+<!-- $$
+\begin{bmatrix}
+    w_{00} x_{00} &  w_{01} x_{00} + w_{00} x_{01} &  w_{02} x_{00} + w_{01} x_{01}& w_{02} x_{01} \\
+    w_{01} x_{00} + w_{00} x_{10}& 
+    \begin{split}
+    w_{11}x_{00} &+ w_{10}x_{01} \\
+    + w_{01}&x_{10} + w_{00}x_{11}  
+    \end{split}&
+
+    \begin{split}
+    w_{12} x_{00} &+ w_{11}x_{01} \\ + w_{02}&x_{10}+ w_{01}x_{11}
+    \end{split}&
+    w_{12}x_{01} + w_{02}x_{11} \\
+    
+    
+    w_{20}x_{00} + w_{10} x_{10}& 
+    \begin{split}
+    w_{21}x_{00} &+ w_{20}x_{01} \\
+    + w_{11}&x_{10} + w_{10} x_{11}
+    \end{split}& 
+
+
+    \begin{split}
+    w_{22}x_{00} &+ w_{21}x_{01} \\
+    + w_{12}&x_{10} + w_{11} x_{11}
+    \end{split}&
+    
+    
+    \\  
+\end{bmatrix}
+$$ -->
+
+<p><br /> <br /> <br /> <br /></p>
+
+<hr />
+
+<h3 id="parameters-for-pytorch-implementation">Parameters for Pytorch Implementation</h3>
+
+<p>Up to now, we’ve observed how transposed convolutions achieve upsampling by exchanging the forward and backward passes of standard convolutions. Furthermore, the transposed convolution also has a corresponding standard convolution form. In general, for kernel size \(k\), stride \(s\), dilation \(d\), padding \(p\), and output padding \(o\), the convolutional form is recovered by</p>
+
+<p><br /></p>
+
+<ol>
+  <li>
+    <p>padding within the data by inserting \(s - 1\) zeros between rows and columns</p>
+  </li>
+  <li>
+    <p>padding the outer edges of the data with \(p' = d(k-1)-p + o\) zeros.</p>
+  </li>
+  <li>
+    <p>Flipping the kernel \(W\) to get \(W'\)</p>
+  </li>
+  <li>
+    <p>Convolve the padded data with the flipped kernel \(X' \star W'\) with stride \(s' = 1\).</p>
+  </li>
+</ol>
+
+<p><br /></p>
+
+<p>Given the above procedure, we can understand how each of the parameters affect the transposed convolution output.</p>
+
+<p><br /></p>
+
+<ul>
+  <li>\(s\) only affects the amount of padding within the data elements.</li>
+  <li>\(d\) increases the outer padding size by a factor of \(k-1\)</li>
+  <li>\(p\) directly decreases the outer padding size on the input data.</li>
+  <li>\(o\) directly increases the outer padding size on the input data.</li>
+</ul>
+
+<p><br /><br /><br /><br /></p>
+
+<hr />
+
+<h3 id="python-code">Python Code</h3>
+
+<!-- Below I present working code that shows the equivalence between the Pytorch implementation of transposed convolution and its corresponding convolution form. There is close agreement up to small numerical errors. -->
+
+<p>Here is code that demonstrates that transposed convolution and its standard convolution form are equivalent. It initializes random input data, performs a forward pass through a transposed convolution layer and the corresponding standard convolution, and then checks agreement between the outputs up to small numerical errors.</p>
+
+<p><br /><br /></p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Import functions
+</span>
+<span class="kn">import</span> <span class="n">torch</span>
+<span class="kn">import</span> <span class="n">torch.nn</span> <span class="k">as</span> <span class="n">nn</span>
+<span class="kn">import</span> <span class="n">torch.nn.functional</span> <span class="k">as</span> <span class="n">F</span>
+
+<span class="c1"># define zero padding in between matrix entries.
+</span>
+<span class="k">def</span> <span class="nf">pad_within</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">stride</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">x</span><span class="p">.</span><span class="nf">new_zeros</span><span class="p">(</span><span class="n">stride</span><span class="p">,</span> <span class="n">stride</span><span class="p">)</span>
+        <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">F</span><span class="p">.</span><span class="nf">conv_transpose2d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">w</span><span class="p">.</span><span class="nf">expand</span><span class="p">(</span><span class="n">x</span><span class="p">.</span><span class="nf">size</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="n">stride</span><span class="p">,</span> <span class="n">stride</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="n">stride</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="n">x</span><span class="p">.</span><span class="nf">size</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="p">[:,:,:</span><span class="o">-</span><span class="n">stride</span><span class="o">+</span><span class="mi">1</span><span class="p">,:</span><span class="o">-</span><span class="n">stride</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">x</span>
+    <span class="k">return</span> <span class="n">out</span>
+
+<span class="c1"># Set the parameters
+</span>
+<span class="n">w</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="n">h</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">kernel</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="n">stride</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="n">padding</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="n">outpad</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">dilation</span> <span class="o">=</span> <span class="mi">3</span>
+
+<span class="c1"># Set the kernel
+</span>
+<span class="n">kernel_weights</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="nf">rand</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">kernel</span><span class="p">))</span>
+
+<span class="c1"># generate some data
+</span>
+<span class="n">img</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="nf">randn</span><span class="p">(</span><span class="n">h</span><span class="p">,</span><span class="n">w</span><span class="p">).</span><span class="nf">float</span><span class="p">().</span><span class="nf">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="n">h</span><span class="p">,</span><span class="n">w</span><span class="p">)</span>
+
+<span class="c1"># initiate pytorch function with generated kernel
+</span>
+<span class="n">convT</span> <span class="o">=</span> <span class="n">nn</span><span class="p">.</span><span class="nc">ConvTranspose2d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">stride</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">outpad</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">dilation</span><span class="o">=</span><span class="n">dilation</span><span class="p">)</span>
+<span class="n">convT</span><span class="p">.</span><span class="n">weight</span><span class="p">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">kernel_weights</span>
+
+<span class="c1"># compute output size
+</span>
+<span class="n">w_out</span> <span class="o">=</span> <span class="p">(</span><span class="n">w</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">stride</span> <span class="o">-</span><span class="mi">2</span><span class="o">*</span><span class="n">padding</span><span class="o">+</span><span class="n">dilation</span><span class="o">*</span><span class="p">(</span><span class="n">kernel</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">+</span><span class="n">outpad</span><span class="o">+</span><span class="mi">1</span>
+<span class="n">h_out</span> <span class="o">=</span> <span class="p">(</span><span class="n">h</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">stride</span> <span class="o">-</span><span class="mi">2</span><span class="o">*</span><span class="n">padding</span><span class="o">+</span><span class="n">dilation</span><span class="o">*</span><span class="p">(</span><span class="n">kernel</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">+</span><span class="n">outpad</span><span class="o">+</span><span class="mi">1</span>
+
+<span class="c1"># pad or crop edges and within
+</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">dilation</span> <span class="o">*</span> <span class="p">(</span><span class="n">kernel</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">padding</span> <span class="o">+</span> <span class="n">outpad</span>
+<span class="k">if</span> <span class="n">p</span> <span class="o">&gt;=</span><span class="mi">0</span><span class="p">:</span>
+    <span class="n">img_</span> <span class="o">=</span> <span class="nf">pad_within</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">stride</span><span class="p">)</span>
+    <span class="n">img_</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="n">nn</span><span class="p">.</span><span class="n">functional</span><span class="p">.</span><span class="nf">pad</span><span class="p">(</span><span class="n">img_</span><span class="p">,</span> <span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">p</span><span class="p">))</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">img_</span> <span class="o">=</span> <span class="nf">pad_within</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">stride</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">p</span><span class="p">:</span><span class="n">p</span><span class="p">,</span> <span class="o">-</span><span class="n">p</span><span class="p">:</span><span class="n">p</span><span class="p">][</span><span class="bp">None</span><span class="p">,</span><span class="bp">None</span><span class="p">,:]</span>
+
+
+<span class="c1"># convolve padded image and transposed kernel
+</span>
+<span class="n">kernel_transposed</span> <span class="o">=</span> <span class="n">kernel_weights</span><span class="p">.</span><span class="nf">flip</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">uf</span> <span class="o">=</span> <span class="n">nn</span><span class="p">.</span><span class="nc">Unfold</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">dilation</span><span class="o">=</span><span class="n">dilation</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">conv2d</span> <span class="o">=</span> <span class="p">(</span><span class="nf">uf</span><span class="p">(</span><span class="n">img_</span><span class="p">)</span><span class="o">*</span><span class="n">kernel_transposed</span><span class="p">.</span><span class="nf">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)).</span><span class="nf">sum</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">my_convT</span> <span class="o">=</span> <span class="n">conv2d</span><span class="p">.</span><span class="nf">reshape</span><span class="p">(</span><span class="n">h_out</span><span class="o">+</span><span class="n">outpad</span><span class="p">,</span> <span class="n">w_out</span><span class="o">+</span><span class="n">outpad</span><span class="p">)[</span><span class="n">outpad</span><span class="p">:,</span><span class="n">outpad</span><span class="p">:]</span>
+
+<span class="c1"># check agreement with torch output
+</span>
+<span class="nf">print</span><span class="p">(</span><span class="n">torch</span><span class="p">.</span><span class="nf">isclose</span><span class="p">(</span><span class="n">torch_convT</span><span class="p">,</span> <span class="n">my_convT</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-7</span><span class="p">).</span><span class="nf">prod</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+</code></pre></div></div>
+
+<!-- https://leimao.github.io/blog/Transposed-Convolution-As-Convolution/ -->
+<!-- https://www.coursera.org/lecture/convolutional-neural-networks/transpose-convolutions-kyoqR -->
+
+<!-- https://towardsdatascience.com/what-is-transposed-convolutional-layer-40e5e6e31c11 -->
+
+<!-- https://github.com/vdumoulin/conv_arithmetic/blob/master/README.md -->
+
+<p><br /><br /><br /><br /><br /><br /></p>
+
+<hr />
+
+<!-- **References** -->
+
+<ol class="bibliography font-size-blog-ref"><li>  
+
+  Vincent Dumoulin,&nbsp;and&nbsp;Francesco Visin. "A guide to convolution arithmetic for deep learning".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  <em>arXiv preprint: 1603.07285</em>, 2016.
+  
+
+
+</li>
+<li>  
+
+  Justin Johnson,&nbsp;and&nbsp;David Fouhey. "Backpropagation for a Linear Layer".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  <em>EECS 442: Computer Vision Notes</em>,.
+  
+
+
+</li></ol>
+
+<p><br /><br /><br /><br /><br /><br /></p>
+
+<hr />
+
+<p><br /><br /><br /></p>
+
+<!-- [^1]: <span id="dumoulin2016guide"><span style="font-variant: small-caps"><span style="font-variant: small-caps">Dumoulin, Vincent</span> ; <span style="font-variant: small-caps">Visin, Francesco</span></span>: A guide to convolution arithmetic for deep learning. In: <i>arXiv preprint: 1603.07285</i> (2016)</span> -->]]></content><author><name></name></author><category term="All" /><summary type="html"><![CDATA[I present an interactive tool that visualizes how altering parameters values of the transposed convlution affects the resulting output. Further, I discuss the connection between transposed convolution and standard convolution, and provide Pytorch Code that demonstrates their relationship.]]></summary></entry></feed>

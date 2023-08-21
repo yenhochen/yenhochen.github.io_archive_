@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <!-- Head -->
+  <head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-E88VF4WGMP"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-E88VF4WGMP');
+    </script>
+    <!-- Metadata, OpenGraph and Schema.org -->
+    
+
+    <!-- Standard metadata -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>ADMM for Generalized Lasso Inference</title>
+    <meta name="author" content="Yenho  Chen">
+    <meta name="description" content="L1 penalized inference is central to the field of compressed sensing. I derive an ADMM solver for the generalized Lasso problem and discuss three important special cases; standard lasso, variable fusion, and fused lasso. Further, I provide python code and demonstrate it on a simulated dataset.">
+
+
+    <!-- Bootstrap & MDB -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha256-DF7Zhf293AJxJNTmh5zhoYYIMs2oXitRfBjY+9L//AY=" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" crossorigin="anonymous">
+
+    <!-- Bootstrap Table -->
+    <link defer rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.21.4/dist/bootstrap-table.min.css">
+
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" integrity="sha256-HtsXJanqjKTc8vVQjO4YMhiqFoXkfBsjBWcX91T1jr8=" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/academicons@1.9.1/css/academicons.min.css" integrity="sha256-i1+4qU2G2860dGGIOJscdC30s9beBXjFfzjWLjBRsBg=" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons">
+
+    <!-- Code Syntax Highlighting -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jwarby/jekyll-pygments-themes@master/github.css" media="" id="highlight_theme_light">
+
+    
+
+    <!-- Styles -->
+    
+    <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%F0%9F%8C%B1&lt;/text&gt;&lt;/svg&gt;">
+    
+    <link rel="stylesheet" href="/yenhochen/assets/css/main.css">
+    <link rel="canonical" href="http://localhost:4000/yenhochen/blog/2023/ADMM-Generalized-Lasso/">
+
+    <!-- Dark Mode -->
+    
+
+
+    
+
+
+
+ 
+
+    <!-- <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script> -->
+
+  </head>
+
+  <!-- Body -->
+  <body class=" sticky-bottom-footer">
+
+
+    <!-- Header -->
+    <header>
+
+      <!-- Nav Bar -->
+      <nav id="navbar" class="navbar navbar-light navbar-expand-sm sticky-top">
+        <div class="container">
+          <!-- <a class="navbar-brand title font-weight-lighter" href="/yenhochen/"><span class="font-weight-bold">Yenho&nbsp;</span>Chen</a> -->
+          <!-- Navbar Toggle -->
+          <button class="navbar-toggler collapsed ml-auto" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar top-bar"></span>
+            <span class="icon-bar middle-bar"></span>
+            <span class="icon-bar bottom-bar"></span>
+          </button>
+
+          <div class="collapse navbar-collapse text-right" id="navbarNav">
+            <ul class="navbar-nav ml-auto flex-nowrap">
+
+              <!-- About -->
+              <li class="nav-item ">
+                <a class="nav-link" href="/yenhochen/">home</a>
+              </li>
+              
+              <!-- Blog -->
+              <li class="nav-item active">
+                <a class="nav-link" href="/yenhochen/blog/">blog<span class="sr-only">(current)</span></a>
+              </li>
+
+              <!-- Other pages -->
+              <!--
+              <li class="nav-item ">
+                <a class="nav-link" href="/yenhochen/publications/">publications</a>
+              </li>
+              <li class="nav-item ">
+                <a class="nav-link" href="/yenhochen/code/">code</a>
+              </li>-->
+              <!-- -->
+            </ul>
+          </div>
+        </div>
+      </nav>
+
+    </header>
+
+
+    <!-- Content -->
+    <div class="container mt-5">
+      
+        <!-- _layouts/post.html -->
+
+
+
+<div class="post">
+
+  <header class="post-header">
+    <h1 class="post-title">ADMM for Generalized Lasso Inference</h1>
+    <p class="blog-description">L1 penalized inference is central to the field of compressed sensing. I derive an ADMM solver for the generalized Lasso problem and discuss three important special cases; standard lasso, variable fusion, and fused lasso. Further, I provide python code and demonstrate it on a simulated dataset.</p>
+    <br>
+    <p class="post-meta">August 21, 2023</p>
+    <br>
+    <!-- <p class="post-tags">
+      <a href="/yenhochen/blog/2023"> <i class="fas fa-calendar fa-sm"></i> 2023 </a> -->
+      <!-- -->
+
+      <!-- -->
+
+    <!-- </p> -->
+  </header>
+
+  <article class="post-content">
+    
+    <div id="markdown-content">
+      <hr>
+
+<p>Sparsity plays an important role in machine learning, statistics, and signal processing. In the basic set up, we are given a noisy observation \(y\in\mathbb{R}^m\) and a dictionary \(D \in \mathbb{R}^{m\times n}\). The goal is to estimate the weights \(w \in \mathbb{R}^n\) that produce the observation under the assumption that most of its entries have a value of zero. A popular approach to obtaining sparse solutions is through the class of \(\ell_1\) penalized regression problems. Mathematically, these are written as</p>
+
+\[\DeclareMathOperator*{\argmin}{arg\,min}
+% \DeclareMathOperator{\argmax}{arg\,max}
+
+\begin{equation}
+\label{eq:general-lasso}
+w^* = \argmin_{w} \frac{1}{2} \| Dw - y \|_2^2 + \lambda \| F w \|_1
+\end{equation}\]
+
+<p>where \(F \in \mathbb{R}^{k \times n}\) encodes \(K\) distinct \(\ell_1\)-norm penalties, and  \(\lambda \geq 0\) is a lagrange multiplier that determines the strength of those penalty terms. In statistics, this is also known as the generalized Lasso problem <a class="citation" href="#tibshirani2011solution">[1]</a>. The main challenge with solving equation \(\ref{eq:general-lasso}\) lies in the non-differentiability of the \(\ell_1\)-norm. Therefore, we cannot obtain an analytical solution and must resort to iterative solvers.</p>
+
+<p><br></p>
+
+<!-- The main aim of this post is to carefully work through the derivation of an efficient iterative solution for L1 penalized objectives. While existing texts offer the solution, they often omit many important details in the explanation and assume substantial background knowledge. In contrast, I provide a derivation that is accessible to those with only a basic knowledge in matrix calculus and linear algebra. -->
+
+<hr>
+
+<!-- This is achieved by combining the benefits of decomposability from dual ascent with the fast convergence properties of the method of multipliers. -->
+
+<h3 id="deriving-an-admm-algorithm">Deriving an ADMM algorithm</h3>
+
+<p>An overview of the ADMM framework can be found 
+<a href="/yenhochen/blog/2023/Alternating-Directions-Method-of-Multipliers/">here</a> 
+. We can rewrite the generalized Lasso into ADMM form by introducing a variable \(z\) and a constraint which transforms equation \(\ref{eq:general-lasso}\) into the following problem</p>
+
+\[\begin{equation}
+\min_w \frac{1}{2} \|Dw-y \|_2^2 + \lambda \| z \|_1 \quad
+\textrm{ subject to }
+F w = z
+\end{equation}\]
+
+<p>The corresponding scaled Augmented Lagragian is given by</p>
+
+\[\begin{equation}
+\label{eq:L}
+L(w, z, u) = \frac{1}{2} \|Dw-y \|_2^2 + \lambda \| z \|_1 + \frac{\rho}{2} \|F w-z +u \|_2^2 - \frac{\rho}{2} \|u \|_2^2
+\end{equation}\]
+
+<p>Note that introducing \(z\) doesn’t change the optimal solution since the additional penalty terms in \(L\) are minimized when \(w-z=0\). However, we benefit from separating the \(\ell_1\) penalty from the reconstruction term. ADMM proceeds with block minimization under \(L\). This consists of an \(w\)-minimization step, a  \(z\)-minimization step, and a gradient ascent update step on the dual variables \(u\). 
+<!-- However, a major benefit is that the ADMM form enables separability between the smooth and non-smooth components in the objective.  -->
+<!-- As a result, we can proceed .  --></p>
+
+<hr>
+
+<h5 id="updating-w">Updating \(w\)</h5>
+
+<p>The standard ADMM update for \(w\) is given by</p>
+
+\[w_{k+1} = \argmin_w \hspace{0.2em} L(w, z_{k}, u_k)\]
+
+<p>To obtain the RHS, we set the partial derivative of equation \(\ref{eq:L}\) wrt. \(w\) to zero.</p>
+
+\[\nabla_w L = D^\top(Dw-y) + \rho F^\top (F w-z+u) = 0\]
+
+<p>Now rearrange to collect terms with \(w\) on the LHS and all other terms on the RHS.</p>
+
+\[D^\top Dw  + \rho F^\top F w = D^\top y + \rho F^\top z - \rho F^\top u\]
+
+<p>Factorize and solve for \(w\).</p>
+
+\[w^* = (D^\top D  + \rho F^\top F)^{-1}(D^\top y +\rho F^\top (z_k - u_k))\]
+
+<p>\(w^*\) minimizes the augmented Lagrangian given our previous estimates of \(z_k\) and \(u_k\) and becomes the closed-form update rule for \(w_{k+1}\).</p>
+
+<!-- $$
+\begin{alignat*}{2}
+\Rightarrow \quad &D^\top Dw  + \rho F^\top F w = D^\top y + \rho F^\top z - \rho F^\top u\\
+% &(D^\top D  + \rho F^\top F) w = D^\top y +\rho F^\top (z - u)\\
+\Rightarrow \quad & w = (D^\top D  + \rho F^\top F)^{-1}(D^\top y +\rho F^\top (z_k - u_k))\\
+\end{alignat*}
+$$ -->
+
+<hr>
+
+<h5 id="updating-z">Updating \(z\)</h5>
+
+<p>Next, we find the ADMM update for \(z\)</p>
+
+\[z_{k+1} = \argmin_z \hspace{0.2em} L(w_{k+1}, z, u_k)\]
+
+<p>Similarly, we set the partial derivative of \(L\) wrt. \(z\) to zero</p>
+
+\[\begin{equation}
+\label{eq:L_z}
+\nabla_z L = \frac{\partial}{\partial z} (\lambda \|z \|_1) - \rho (Fw-z+u) = 0
+\end{equation}\]
+
+<p>Immediately, we encounter the non-differentiable \(\ell_1\) term. We can proceed by observing two facts.  1) The overall \(\ell_1\) penalty can be decomposed as a sum of \(\ell_1\) separate penalties placed on each component of \(z\),  i.e.
+\(\|z\|_1 = \sum_{i=1}^N |z_i|\). Therefore, we can deal with each component independently. And
+2) For each component, there exists only a single discontinuity centered around zero, and that the derivative exists for all other values. Therefore, we can split this problem into two cases \(z=0\) and \(z\neq 0\).</p>
+
+<p><br></p>
+
+<p>For \(z \neq 0\), the derivative is equal to the \({\rm sign} (z)\) which can be substituted into equation \(\ref{eq:L_z}\) to get</p>
+
+\[\lambda {\rm sign}(z) - \rho (Fw-z+u) = 0\]
+
+<p>Collecting all terms with \(z\) on the LHS and all others on the RHS, we get</p>
+
+\[z + \frac{\lambda}{\rho} {\rm sign}(z)= Fw + u\]
+
+<p>When \(z &lt; 0\), then \(Fw + u &lt; -\frac{\lambda}{\rho}\) and when \(z &gt; 0\), then \(Fw + u &gt; \frac{\lambda}{\rho}\). This observation can be compactly written as
+\(|Fw + u| &gt; \frac{\lambda}{\rho}\)
+and \({\rm sign}(z) = {\rm sign}(Fw+u)\) to get the update</p>
+
+\[z^* = Fw + u - \frac{\lambda}{\rho} {\rm sign}(Fw + u)\]
+
+<p><br></p>
+
+<p>When \(z = 0\), we must deal with the discontinuity using subgradients, which is given by \(\partial \| z\|_1 =[-1,1]\). The optimality condition is zero exists within the subgradient. Substituting this into equation \(\ref{eq:L_z}\),</p>
+
+\[0 \in \lambda[-1,1] - \rho (Fw-z+u)\]
+
+<p>which can be rearranged to get the form</p>
+
+\[Fw+u  \in \left[-\frac{\lambda}{\rho},\frac{\lambda}{\rho}\right]\]
+
+<p>In words, \(z=0\) is an optimal solution only when \(Fw+u\) is within the region \(\left[-\frac{\lambda}{\rho},\frac{\lambda}{\rho}\right]\). Combining the results above for \(z \neq 0\) with \(z = 0\), we get the following updates</p>
+
+\[z_{k+1} = 
+\begin{cases}
+   0 &amp;, \quad|Fw_{k+1}+u_k| \leq \frac{\lambda}{\rho} \\
+   Fw_{k+1} + u_k - \frac{\lambda}{\rho} {\rm sign}(w_{k+1}) &amp;, \quad |Fw_{k+1}+u_k| &gt; \frac{\lambda}{\rho}
+\end{cases}\]
+
+<p>More compactly this can be written using the soft-threshold operator \(\mathcal{S}\). The update equation for \(z\) is given by</p>
+
+\[\begin{align*}
+z_{k+1} &amp;= {\rm sign}(Fw_{k+1} + u_k) \max  \left( \left| Fw_{k+1} + u_k \right| - \frac{\lambda}{\rho}, 0 \right) \\
+&amp;= \mathcal{S}_{\lambda/\rho} \left(Fw_{k+1} + u_k  \right)
+\end{align*}\]
+
+<p><!-- Therefore, there are two different cases we encounter when computing the gradient of the --></p>
+
+<hr>
+
+<h5 id="updating-u">Updating \(u\)</h5>
+
+<p>Given the updated \(w_{k+1}\) and \(z_{k+1}\), we perform a gradient ascent update to the dual variables. This is simply given by the running sum of residuals</p>
+
+\[u_{k+1} = u_k + F w_{k+1} - z_{k+1}\]
+
+<hr>
+
+<h3 id="special-cases-of-the-generalized-lasso">Special Cases of the Generalized Lasso</h3>
+
+<p>For different choices of \(F\), we recover several well-studied problems as special cases.</p>
+
+<p><br><br></p>
+
+<h6 id="standard-lasso">Standard Lasso</h6>
+
+<p>When \(F\) is an identity matrix \(I\in\mathbb{R}^{n \times n}\), we recover the standard Lasso problem <a class="citation" href="#tibshirani1996regression">[2]</a></p>
+
+\[\min_w \frac{1}{2} \|Dw - y \|_2^2 + \lambda \| w \|_1\]
+
+<p>This model is commonly used in compressed sensing where we are interested in sparse signal recovery, and can be used as a convex relaxation for \(\ell_0\)-norm variable selection problem .</p>
+
+<p><br><br></p>
+
+<h6 id="variable-fusion">Variable Fusion</h6>
+
+<p>When \(F \in \mathbb{R}^{(n-1) \times n}\) is a first order difference matrix,</p>
+
+\[F_{ij} = 
+\begin{cases}
+1 &amp;,\quad i = j -1\\
+-1 &amp;,\quad i = j \\
+0 &amp;, \quad {\rm  otherwise}
+\end{cases}\]
+
+<p>we obtain the variable fusion model
+<a class="citation" href="#land1996variable">[3]</a> which corresponds to the problem</p>
+
+\[\min_w \frac{1}{2} \|Dw - y \|_2^2 + \lambda \sum_{i=2}^n \| w_{k} -  w_{k-1}\|_1\]
+
+<p>This model is used when we expect the ordering of the weights to have smooth structure.</p>
+
+<p><br><br></p>
+
+<h6 id="fused-lasso">Fused Lasso</h6>
+
+<p>When \(F \in \mathbb{R}^{(2n-1)\times n}\) combines both the penalty from the standard lasso and the variable fusion,</p>
+
+\[F = 
+
+\begin{bmatrix}
+F_{\textrm{Lasso}} \\
+F_{\textrm{Fusion}}
+\end{bmatrix}\]
+
+<p>we obtain the Fused Lasso model <a class="citation" href="#tibshirani2005sparsity">[4]</a> which combines both a sparsity and smoothness penalty.</p>
+
+\[\min_w \frac{1}{2} \|Dw - y \|_2^2 + \lambda_1 \| w \|_1 + \lambda_2 \sum_{i=2}^n \| w_{k} -  w_{k-1}\|_1\]
+
+<h3 id="demo">Demo</h3>
+
+<p>I illustrate the impact of the various penalties mentioned earlier on the inference results. Noisy observations are generated from a random dictionary using smooth and sparse weights. For a given set of hyperparameters, we obtain the following ADMM solutions</p>
+
+<!-- <div class="home-img-container">
+  <img src="assets/img/ADMM-lasso-results.png" width="300px" height="300px" id="ADMM"> 
+</div> -->
+
+<!-- <div class="col-sm mt-3 mt-md-0"> -->
+<!-- </div> -->
+<p><br></p>
+
+<figure>
+
+  <picture>
+    
+    <source class="responsive-img-srcset" media="(max-width: 480px)" srcset="/yenhochen/assets/img/ADMM-lasso-results-480.webp"></source>
+    <source class="responsive-img-srcset" media="(max-width: 800px)" srcset="/yenhochen/assets/img/ADMM-lasso-results-800.webp"></source>
+    <source class="responsive-img-srcset" media="(max-width: 1400px)" srcset="/yenhochen/assets/img/ADMM-lasso-results-1400.webp"></source>
+    
+
+    <!-- Fallback to the original file -->
+    <img src="/yenhochen/assets/img/ADMM-lasso-results.png" class="admm-figure" width="75%" height="auto" onerror="this.onerror=null; $('.responsive-img-srcset').remove();">
+
+  </picture>
+
+</figure>
+
+<p>The standard lasso problem encourages shrinkage towards zero of each weight independently. While it accurately captures certain regions with active support, adjacent weights can have large variance.  On the other hand, the variable fusion model prioritizes smooth patterns and effectively identifies distinct areas of smoothness. However, since its penalty does not promote zero shrinkage, it incorrectly identifies that the entire support is active. The fused Lasso model excels in accurately identifying both smoothness and the active support set. Importantly, note that solutions across all models exhibit a bias towards lower magnitudes than the actual weights. This is because \(\ell_1\) inference provides a biased estimate of the weight vector.</p>
+
+<!-- This is a direct result of the soft-thresholding operation. -->
+
+<!-- The variable fusion model encourages smooth structure and correctly finds different regions of smoothness. However, since it's penalty does not encourage shrinkage towards zero, it incorrectly identifies active coefficients (i.e. indices 1-12, 8-36 and 45-50). The fused Lasso model most accurately identifies smoothness and the set of active coefficients. Finally, notice that the optimal solution for all models are biased to have lower magnitude than the true weights.  -->
+
+<p><br><br></p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="n">numpy</span> <span class="k">as</span> <span class="n">np</span>
+<span class="kn">import</span> <span class="n">numpy.random</span> <span class="k">as</span> <span class="n">npr</span>
+
+<span class="k">def</span> <span class="nf">soft_threshold</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">thresh</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="p">.</span><span class="nf">sign</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">*</span> <span class="n">np</span><span class="p">.</span><span class="nf">max</span><span class="p">([</span><span class="n">np</span><span class="p">.</span><span class="nf">abs</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">-</span><span class="n">thresh</span><span class="p">,</span> <span class="n">np</span><span class="p">.</span><span class="nf">zeros</span><span class="p">(</span><span class="nf">len</span><span class="p">(</span><span class="n">x</span><span class="p">))],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">ADMM_generalized_lasso</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">lam</span><span class="p">,</span> <span class="n">n_iters</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+    <span class="sh">'''</span><span class="s">
+    y: (m,) array. observation
+
+    D: (m, n) array. dictionary
+
+    F: (k, n) array. constraint matrix
+
+    rho: augmented lagrange multiplier
+
+    lam: lagrange multiplier
+    
+    </span><span class="sh">'''</span>
+
+    <span class="n">n</span> <span class="o">=</span> <span class="nf">len</span><span class="p">(</span><span class="n">D</span><span class="p">.</span><span class="n">T</span><span class="p">)</span>
+
+    <span class="c1"># random initialization
+</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> 
+    <span class="n">u</span> <span class="o">=</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">(</span><span class="nf">len</span><span class="p">(</span><span class="n">F</span><span class="p">))</span> 
+    <span class="n">z</span> <span class="o">=</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">(</span><span class="nf">len</span><span class="p">(</span><span class="n">F</span><span class="p">))</span> 
+    
+    <span class="n">FtF</span> <span class="o">=</span> <span class="n">F</span><span class="p">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">F</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nf">range</span><span class="p">(</span><span class="n">n_iters</span><span class="p">):</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">linalg</span><span class="p">.</span><span class="nf">lstsq</span><span class="p">(</span><span class="n">D</span><span class="p">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">D</span> <span class="o">+</span> <span class="n">rho</span> <span class="o">*</span> <span class="n">FtF</span><span class="p">,</span> <span class="n">D</span><span class="p">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">y</span> <span class="o">+</span> <span class="n">rho</span> <span class="o">*</span> <span class="n">F</span><span class="p">.</span><span class="n">T</span> <span class="o">@</span> <span class="p">(</span><span class="n">z</span><span class="o">-</span><span class="n">u</span><span class="p">),</span> <span class="n">rcond</span><span class="o">=</span><span class="bp">None</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="nf">soft_threshold</span><span class="p">(</span><span class="n">F</span> <span class="o">@</span> <span class="n">w</span> <span class="o">+</span> <span class="n">u</span><span class="p">,</span> <span class="n">lam</span><span class="o">/</span><span class="n">rho</span><span class="p">)</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="n">u</span> <span class="o">+</span> <span class="n">F</span> <span class="o">@</span> <span class="n">w</span> <span class="o">-</span> <span class="n">z</span>
+        
+    <span class="k">return</span> <span class="n">w</span>
+
+<span class="kn">from</span> <span class="n">sklearn.datasets</span> <span class="kn">import</span> <span class="n">make_sparse_coded_signal</span>
+<span class="kn">import</span> <span class="n">matplotlib.pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+
+<span class="n">n</span><span class="p">,</span> <span class="n">m</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">100</span>
+<span class="n">n_nonzero_coefs</span> <span class="o">=</span> <span class="mi">10</span>
+
+<span class="c1"># generate dictionary
+</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="nf">make_sparse_coded_signal</span><span class="p">(</span>
+    <span class="n">n_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">n_components</span><span class="o">=</span><span class="n">n</span><span class="p">,</span>
+    <span class="n">n_features</span><span class="o">=</span><span class="n">m</span><span class="p">,</span>
+    <span class="n">n_nonzero_coefs</span><span class="o">=</span><span class="n">n_nonzero_coefs</span><span class="p">,</span>
+    <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">D</span> <span class="o">=</span> <span class="n">D</span><span class="p">.</span><span class="n">T</span>
+
+
+
+<span class="c1"># generate structured coefficients
+</span>
+<span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="nf">seed</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">w_true</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="nf">zeros</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nf">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+    <span class="n">ix</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="nf">choice</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+    <span class="n">length</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="nf">randint</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span>
+    <span class="n">w_true</span><span class="p">[</span><span class="n">ix</span><span class="p">:</span><span class="n">ix</span><span class="o">+</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">()</span>
+    
+    
+<span class="c1"># generate noisy observations 
+</span>
+<span class="n">y_true</span> <span class="o">=</span> <span class="n">D</span> <span class="o">@</span> <span class="n">w_true</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">y_true</span> <span class="o">+</span> <span class="n">npr</span><span class="p">.</span><span class="nf">randn</span><span class="p">(</span><span class="n">m</span><span class="p">)</span><span class="o">*</span><span class="mf">0.2</span>
+
+
+<span class="c1"># define hyperparameters
+</span>
+<span class="n">rho</span> <span class="o">=</span> <span class="mf">0.3</span> <span class="c1"># augmentation multiplier
+</span>
+<span class="n">lam</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="c1"># general multiplier for L1
+</span>
+<span class="n">lam2</span> <span class="o">=</span> <span class="mf">0.3</span> <span class="c1"># multipler for sparsity in Fused Lasso
+</span>
+
+
+
+<span class="c1"># construct F matrices
+</span>
+<span class="n">F_Lasso</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="nf">eye</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="c1"># Lasso solution
+</span>
+<span class="n">F_fusion</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">diag</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">ones</span><span class="p">(</span><span class="n">n</span><span class="p">),</span><span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">np</span><span class="p">.</span><span class="nf">diag</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">ones</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">*-</span><span class="mi">1</span><span class="p">,</span><span class="n">k</span><span class="o">=</span><span class="mi">0</span><span class="p">))[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="c1"># Fusion Penalty solution
+</span>
+<span class="n">F_fusedLasso</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="nf">concatenate</span><span class="p">([</span><span class="n">np</span><span class="p">.</span><span class="nf">diag</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">ones</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">/</span><span class="n">lam</span><span class="o">*</span><span class="n">lam2</span><span class="p">),</span> <span class="n">F_fusion</span><span class="p">])</span> <span class="c1"># Fused Lasso solution
+</span>
+
+<span class="c1"># compute ADMM solution
+</span>
+<span class="n">w_lasso</span> <span class="o">=</span> <span class="nc">ADMM_generalized_lasso</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F_Lasso</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">lam</span><span class="p">)</span>
+<span class="n">w_fusion</span> <span class="o">=</span> <span class="nc">ADMM_generalized_lasso</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F_fusion</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">lam</span><span class="p">)</span>
+<span class="n">w_fusedLasso</span> <span class="o">=</span> <span class="nc">ADMM_generalized_lasso</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F_fusedLasso</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">lam</span><span class="p">)</span>
+
+
+    
+<span class="c1"># Plot
+</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">w_lasso</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">"</span><span class="s">Lasso</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">w_fusion</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">"</span><span class="s">Fusion</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">w_fusedLasso</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">"</span><span class="s">Fused Lasso</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">w_true</span><span class="p">,</span> <span class="sh">'</span><span class="s">k--</span><span class="sh">'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">"</span><span class="s">true</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">ylabel</span><span class="p">(</span><span class="sh">"</span><span class="s">Weight</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">xlabel</span><span class="p">(</span><span class="sh">"</span><span class="s">index</span><span class="sh">"</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">show</span><span class="p">()</span>
+    
+
+</code></pre></div></div>
+
+<hr>
+
+<ol class="bibliography font-size-blog-ref">
+<li>  
+
+  Ryan J Tibshirani. "The solution path of the generalized lasso".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  2011.
+  
+
+
+</li>
+<li>  
+
+  Robert Tibshirani. "Regression shrinkage and selection via the lasso".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  <em>Journal of the Royal Statistical Society Series B: Statistical Methodology</em>, 1996.
+  
+
+
+</li>
+<li>  
+
+  S Land, and J Friedman. "Variable fusion: a new method of adaptive signal regression".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  <em>Technical Report, Department of Statistics, Stanford University</em>, 1996.
+  
+
+
+</li>
+<li>  
+
+  Robert Tibshirani, Michael Saunders, Saharon Rosset, Ji Zhu, and Keith Knight. "Sparsity and smoothness via the fused lasso".
+
+
+  <!-- Journal/Book title and date -->
+  
+  
+  <em>Journal of the Royal Statistical Society Series B: Statistical Methodology</em>, 2005.
+  
+
+
+</li>
+</ol>
+
+
+    </div>
+  </article>
+</div>
+
+      
+    </div>
+
+    <!-- Footer -->
+  
+
+    <!-- JavaScripts -->
+    <!-- jQuery -->
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+
+    <!-- Bootsrap & MDB scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/js/bootstrap.bundle.min.js" integrity="sha256-fgLAgv7fyCGopR/gBNq2iW3ZKIdqIcyshnUULC4vex8=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" crossorigin="anonymous"></script>
+
+    <!-- Masonry & imagesLoaded -->
+  <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@4/imagesloaded.pkgd.min.js"></script>
+  <script defer src="/yenhochen/assets/js/masonry.js" type="text/javascript"></script>
+    
+  <!-- Medium Zoom JS -->
+  <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.0.8/dist/medium-zoom.min.js" integrity="sha256-7PhEpEWEW0XXQ0k6kQrPKwuoIomz8R8IYyuU1Qew4P8=" crossorigin="anonymous"></script>
+  <script defer src="/yenhochen/assets/js/zoom.js"></script>
+
+  <!-- Bootstrap Table -->
+  <script defer src="https://unpkg.com/bootstrap-table@1.21.4/dist/bootstrap-table.min.js"></script>
+
+  <!-- Load Common JS -->
+  <script src="/yenhochen/assets/js/no_defer.js"></script>
+  <script defer src="/yenhochen/assets/js/common.js"></script>
+  <script defer src="/yenhochen/assets/js/copy_code.js" type="text/javascript"></script>
+
+    
+
+    <!-- MathJax -->
+  <script type="text/javascript">
+    window.MathJax = {
+      tex: {
+        tags: 'ams'
+      }
+    };
+  </script>
+  <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.0/es5/tex-mml-chtml.js"></script>
+  <script defer src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+
+    
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-E88VF4WGMP"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ window.dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-E88VF4WGMP');
+  </script>
+  </body>
+</html>
